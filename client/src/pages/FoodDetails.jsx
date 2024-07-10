@@ -1,23 +1,21 @@
-import { CircularProgress, Rating } from "@mui/material";
 import React, { useEffect, useState } from "react";
 import styled from "styled-components";
-import Button from "../components/Button";
-import {
-  FavoriteBorder,
-  FavoriteBorderOutlined,
-  FavoriteRounded,
-} from "@mui/icons-material";
+import { CircularProgress, Rating } from "@mui/material";
+import { FavoriteBorderOutlined, FavoriteRounded } from "@mui/icons-material";
 import { useNavigate, useParams } from "react-router-dom";
+import axios from "axios";
 import {
   addToCart,
   addToFavourite,
-  deleteFromCart,
   deleteFromFavourite,
   getFavourite,
   getProductDetails,
-} from "../api";
+  createPaymentOrder, // Import createPaymentOrder API function
+} from "../api"; // Adjust the import path as per your project structure
 import { openSnackbar } from "../redux/reducers/SnackbarSlice";
 import { useDispatch } from "react-redux";
+import Button from "../components/Button";
+
 
 const Container = styled.div`
   padding: 20px 30px;
@@ -52,6 +50,7 @@ const ImagesWrapper = styled.div`
   display: flex;
   justify-content: center;
 `;
+
 const Image = styled.img`
   max-width: 500px;
   width: 100%;
@@ -71,16 +70,19 @@ const Details = styled.div`
   flex-direction: column;
   padding: 4px 10px;
 `;
+
 const Title = styled.div`
   font-size: 28px;
   font-weight: 600;
   color: ${({ theme }) => theme.text_primary};
 `;
+
 const Desc = styled.div`
   font-size: 16px;
   font-weight: 400;
   color: ${({ theme }) => theme.text_primary};
 `;
+
 const Price = styled.div`
   display: flex;
   align-items: center;
@@ -89,6 +91,7 @@ const Price = styled.div`
   font-weight: 500;
   color: ${({ theme }) => theme.text_primary};
 `;
+
 const Span = styled.div`
   font-size: 16px;
   font-weight: 500;
@@ -103,18 +106,20 @@ const Percent = styled.div`
   color: green;
 `;
 
-const Ingridents = styled.div`
+const Ingredients = styled.div`
   font-size: 16px;
   font-weight: 500;
-  diaplay: flex;
+  display: flex;
   flex-direction: column;
   gap: 24px;
 `;
+
 const Items = styled.div`
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
 `;
+
 const Item = styled.div`
   background: ${({ theme }) => theme.primary + 20};
   color: ${({ theme }) => theme.primary};
@@ -144,98 +149,134 @@ const FoodDetails = () => {
   const [favoriteLoading, setFavoriteLoading] = useState(false);
   const [cartLoading, setCartLoading] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [product, setProduct] = useState();
-
-  const getProduct = async () => {
-    setLoading(true);
-    await getProductDetails(id).then((res) => {
-      setProduct(res.data);
-      setLoading(false);
-    });
-  };
-
-  const removeFavourite = async () => {
-    setFavoriteLoading(true);
-    const token = localStorage.getItem("krist-app-token");
-    await deleteFromFavourite(token, { productId: id })
-      .then((res) => {
-        setFavorite(false);
-        setFavoriteLoading(false);
-      })
-      .catch((err) => {
-        setFavoriteLoading(false);
-        dispatch(
-          openSnackbar({
-            message: err.message,
-            severity: "error",
-          })
-        );
-      });
-  };
-
-  const addFavourite = async () => {
-    setFavoriteLoading(true);
-    const token = localStorage.getItem("krist-app-token");
-    await addToFavourite(token, { productId: id })
-      .then((res) => {
-        setFavorite(true);
-        setFavoriteLoading(false);
-      })
-      .catch((err) => {
-        setFavoriteLoading(false);
-        dispatch(
-          openSnackbar({
-            message: err.message,
-            severity: "error",
-          })
-        );
-      });
-  };
-
-  const checkFavorite = async () => {
-    setFavoriteLoading(true);
-    const token = localStorage.getItem("krist-app-token");
-    await getFavourite(token, { productId: id })
-      .then((res) => {
-        const isFavorite = res.data?.some((favorite) => favorite._id === id);
-
-        setFavorite(isFavorite);
-
-        setFavoriteLoading(false);
-      })
-      .catch((err) => {
-        setFavoriteLoading(false);
-        dispatch(
-          openSnackbar({
-            message: err.message,
-            severity: "error",
-          })
-        );
-      });
-  };
+  const [product, setProduct] = useState(null);
 
   useEffect(() => {
-    getProduct();
-    checkFavorite();
+    getProductDetailsData();
+    checkFavoriteStatus();
   }, []);
 
-  const addCart = async () => {
+  const getProductDetailsData = async () => {
+    setLoading(true);
+    try {
+      const response = await getProductDetails(id);
+      setProduct(response.data);
+      setLoading(false);
+    } catch (error) {
+      setLoading(false);
+      dispatch(
+        openSnackbar({
+          message: error.message || "Failed to fetch product details",
+          severity: "error",
+        })
+      );
+    }
+  };
+
+  const checkFavoriteStatus = async () => {
+    setFavoriteLoading(true);
+    try {
+      const token = localStorage.getItem("orderease-app-token");
+      const response = await getFavourite(token, { productId: id });
+      const isFavorited = response.data?.some((fav) => fav._id === id);
+      setFavorite(isFavorited);
+    } catch (error) {
+      dispatch(
+        openSnackbar({
+          message: error.message || "Failed to fetch favorite status",
+          severity: "error",
+        })
+      );
+    } finally {
+      setFavoriteLoading(false);
+    }
+  };
+
+  const addToFavourites = async () => {
+    setFavoriteLoading(true);
+    try {
+      const token = localStorage.getItem("orderease-app-token");
+      await addToFavourite(token, { productId: id });
+      setFavorite(true);
+    } catch (error) {
+      dispatch(
+        openSnackbar({
+          message: error.message || "Failed to add to favorites",
+          severity: "error",
+        })
+      );
+    } finally {
+      setFavoriteLoading(false);
+    }
+  };
+
+  const removeFromFavourites = async () => {
+    setFavoriteLoading(true);
+    try {
+      const token = localStorage.getItem("orderease-app-token");
+      await deleteFromFavourite(token, { productId: id });
+      setFavorite(false);
+    } catch (error) {
+      dispatch(
+        openSnackbar({
+          message: error.message || "Failed to remove from favorites",
+          severity: "error",
+        })
+      );
+    } finally {
+      setFavoriteLoading(false);
+    }
+  };
+
+  const addToCartHandler = async () => {
     setCartLoading(true);
-    const token = localStorage.getItem("krist-app-token");
-    await addToCart(token, { productId: id, quantity: 1 })
-      .then((res) => {
-        setCartLoading(false);
-        navigate("/cart");
-      })
-      .catch((err) => {
-        setCartLoading(false);
-        dispatch(
-          openSnackbar({
-            message: err.message,
-            severity: "error",
-          })
-        );
-      });
+    try {
+      const token = localStorage.getItem("orderease-app-token");
+      await addToCart(token, { productId: id, quantity: 1 });
+      navigate("/cart");
+    } catch (error) {
+      dispatch(
+        openSnackbar({
+          message: error.message || "Failed to add to cart",
+          severity: "error",
+        })
+      );
+    } finally {
+      setCartLoading(false);
+    }
+  };
+
+  const checkoutHandler = async (amount) => {
+    try {
+      const { data: { key } } = await axios.get("http://localhost:8080/api/getkey");
+      const { data: { order } } = await axios.post("http://localhost:8080/api/checkout", { amount });
+  
+      const options = {
+        key,
+        amount: order.amount,
+        currency: "INR",
+        name: "6 Pack Programmer",
+        description: "Tutorial of RazorPay",
+        image: "https://avatars.githubusercontent.com/u/25058652?v=4",
+        order_id: order.id,
+        callback_url: "http://localhost:8080/api/paymentverification",
+        prefill: {
+          name: "Gaurav Kumar",
+          email: "gaurav.kumar@example.com",
+          contact: "9999999999"
+        },
+        notes: {
+          address: "Razorpay Corporate Office"
+        },
+        theme: {
+          color: "#121212"
+        }
+      };
+      const razor = new window.Razorpay(options);
+      razor.open();
+    } catch (error) {
+      console.error("Error during checkout:", error);
+    }
   };
 
   return (
@@ -248,49 +289,54 @@ const FoodDetails = () => {
             <Image src={product?.img} />
           </ImagesWrapper>
           <Details>
-            <div>
-              <Title>{product?.name}</Title>
-            </div>
-            <Rating value={3.5} />
+            <Title>{product?.name}</Title>
+            <Rating value={product?.rating || 0} precision={0.5} readOnly />
             <Price>
-              ₹{product?.price?.org} <Span>₹{product?.price?.mrp}</Span>{" "}
-              <Percent> (₹{product?.price?.off}% Off) </Percent>
+              ₹{product?.price?.org} <Span>₹{product?.price?.mrp}</Span>
+              <Percent>
+                {Math.round(
+                  ((product?.price?.mrp - product?.price?.org) /
+                    product?.price?.mrp) *
+                    100
+                )}
+                % off
+              </Percent>
             </Price>
-
             <Desc>{product?.desc}</Desc>
-
-            <Ingridents>
-              Ingridents
+            <Ingredients>
+              Ingredients
               <Items>
-                {product?.ingredients.map((ingredient) => (
-                  <Item>{ingredient}</Item>
+                {product?.ingredients?.map((item) => (
+                  <Item key={item}>{item}</Item>
                 ))}
               </Items>
-            </Ingridents>
-
+            </Ingredients>
             <ButtonWrapper>
               <Button
                 text="Add to Cart"
-                full
-                outlined
-                isLoading={cartLoading}
-                onClick={() => addCart()}
+                onClick={addToCartHandler}
+                disabled={cartLoading}
               />
-              <Button text="Order Now" full />
               <Button
-                leftIcon={
-                  favorite ? (
-                    <FavoriteRounded sx={{ fontSize: "22px", color: "red" }} />
-                  ) : (
-                    <FavoriteBorderOutlined sx={{ fontSize: "22px" }} />
-                  )
-                }
-                full
-                outlined
-                isLoading={favoriteLoading}
-                onClick={() => (favorite ? removeFavourite() : addFavourite())}
+                text="Buy Now"
+                onClick={checkoutHandler}
+                disabled={cartLoading}
               />
             </ButtonWrapper>
+            {favoriteLoading ? (
+              <CircularProgress size={20} />
+            ) : favorite ? (
+              <FavoriteRounded
+                onClick={removeFromFavourites}
+                color="error"
+                style={{ cursor: "pointer" }}
+              />
+            ) : (
+              <FavoriteBorderOutlined
+                onClick={addToFavourites}
+                style={{ cursor: "pointer" }}
+              />
+            )}
           </Details>
         </Wrapper>
       )}
@@ -299,3 +345,4 @@ const FoodDetails = () => {
 };
 
 export default FoodDetails;
+

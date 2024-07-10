@@ -188,6 +188,7 @@ export const removeFromFavorites = async (req, res, next) => {
     const { productId } = req.body;
     const userJWT = req.user;
     const user = await User.findById(userJWT.id);
+
     user.favourites = user.favourites.filter((fav) => !fav.equals(productId));
     await user.save();
 
@@ -222,9 +223,11 @@ export const getUserFavorites = async (req, res, next) => {
   try {
     const userId = req.user.id;
     const user = await User.findById(userId).populate("favourites").exec();
+    
     if (!user) {
       return next(createError(404, "User not found"));
     }
+    
     const favoriteProducts = user.favourites;
     return res.status(200).json(favoriteProducts);
   } catch (err) {

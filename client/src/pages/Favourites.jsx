@@ -1,95 +1,224 @@
 import React, { useEffect, useState } from "react";
 import styled from "styled-components";
-import ProductsCard from "../components/cards/ProductsCard";
-import { getFavourite } from "../api";
-import { CircularProgress } from "@mui/material";
+import { CircularProgress, Rating } from "@mui/material";
+import {
+  FavoriteBorder,
+  FavoriteRounded,
+  ShoppingBagOutlined,
+} from "@mui/icons-material";
+import { useNavigate } from "react-router-dom";
+import { addToFavourite, deleteFromFavourite, getFavourite } from "../api";
+import { useDispatch } from "react-redux";
+import { openSnackbar } from "../redux/reducers/SnackbarSlice";
 
-const Container = styled.div`
-  padding: 20px 30px;
-  padding-bottom: 200px;
-  height: 100%;
-  overflow-y: scroll;
+const Card = styled.div`
+  width: 300px;
   display: flex;
-  align-items: center;
   flex-direction: column;
-  gap: 30px;
-  @media (max-width: 768px) {
-    padding: 20px 12px;
+  gap: 16px;
+  transition: all 0.3s ease-out;
+  cursor: pointer;
+  @media (max-width: 600px) {
+    width: 180px;
   }
-  background: ${({ theme }) => theme.bg};
 `;
 
-const Section = styled.div`
-  max-width: 1400px;
-  padding: 32px 16px;
+const Image = styled.img`
+  width: 100%;
+  height: 300px;
+  border-radius: 6px;
+  object-fit: cover;
+  transition: all 0.3s ease-out;
+  @media (max-width: 600px) {
+    height: 180px;
+  }
+`;
+
+const Span = styled.div`
+  font-size: 14px;
+  font-weight: 500;
+  color: ${({ theme }) => theme.text_secondary + 60};
+  text-decoration: line-through;
+  text-decoration-color: ${({ theme }) => theme.text_secondary + 50};
+`;
+
+const Percent = styled.div`
+  font-size: 12px;
+  font-weight: 500;
+  color: green;
+`;
+
+const Menu = styled.div`
+  position: absolute;
+  z-index: 10;
+  color: ${({ theme }) => theme.text_primary};
+  top: 14px;
+  right: 14px;
+`;
+
+const MenuItem = styled.div`
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 1px 2px 5px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+  &:hover {
+    background-color: ${({ theme }) => theme.primary};
+    color: white;
+  }
+`;
+
+const Rate = styled.div`
+  position: absolute;
+  z-index: 10;
+  color: ${({ theme }) => theme.text_primary};
+  bottom: 8px;
+  left: 8px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: white;
+  display: flex;
+  align-items: center;
+  opacity: 0.9;
+`;
+
+const Details = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 6px;
+  padding: 4px 10px;
 `;
 
 const Title = styled.div`
-  font-size: 28px;
-  font-weight: 500;
+  font-size: 16px;
+  font-weight: 700;
+  color: ${({ theme }) => theme.text_primary};
+`;
+
+const Desc = styled.div`
+  font-size: 16px;
+  font-weight: 400;
+  color: ${({ theme }) => theme.text_primary};
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  text-overflow: ellipsis;
+  white-space: normal;
+`;
+
+const Price = styled.div`
   display: flex;
-  justify-content: ${({ center }) => (center ? "center" : "space-between")};
   align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 500;
+  color: ${({ theme }) => theme.text_primary};
 `;
 
-const CardWrapper = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 32px;
-  justify-content: center;
-  @media (max-width: 760px) {
-    gap: 16px;
-  }
-`;
+const Favourite = ({ product }) => {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const [favorite, setFavorite] = useState(false);
+  const [favoriteLoading, setFavoriteLoading] = useState(false);
 
-const Favourites = () => {
-  const [loading, setLoading] = useState(false);
-  const [products, setProducts] = useState([]);
-
-  const getProducts = async () => {
-    setLoading(true);
-    const token = localStorage.getItem("krist-app-token");
-    console.log("Retrieved token:", token); // Log the token to check if it's retrieved correctly
-    if (!token) {
-      console.error("Token is missing. User is not authenticated.");
-      setLoading(false);
-      return;
-    }
+  const addFavourite = async () => {
+    setFavoriteLoading(true);
     try {
-      const res = await getFavourite(token);
-      setProducts(res.data);
-    } catch (err) {
-      console.error("Failed to fetch favorites:", err);
+      const token = localStorage.getItem("orderease-app-token");
+      await addToFavourite(token, { productId: product?._id });
+      setFavorite(true);
+    } catch (error) {
+      dispatch(
+        openSnackbar({
+          message: error.response.data.message,
+          severity: "error",
+        })
+      );
     } finally {
-      setLoading(false);
+      setFavoriteLoading(false);
+    }
+  };
+
+  const removeFavourite = async () => {
+    setFavoriteLoading(true);
+    try {
+      const token = localStorage.getItem("orderease-app-token");
+      await deleteFromFavourite(token, { productId: product?._id });
+      setFavorite(false);
+    } catch (error) {
+      dispatch(
+        openSnackbar({
+          message: error.response.data.message,
+          severity: "error",
+        })
+      );
+    } finally {
+      setFavoriteLoading(false);
+    }
+  };
+
+  const checkFavorite = async () => {
+    setFavoriteLoading(true);
+    try {
+      const token = localStorage.getItem("orderease-app-token");
+      const response = await getFavourite(token, { productId: product?._id });
+      const isFavorite = response.data?.some(
+        (favorite) => favorite._id === product?._id
+      );
+      setFavorite(isFavorite);
+    } catch (error) {
+      dispatch(
+        openSnackbar({
+          message: error.response.data.message,
+          severity: "error",
+        })
+      );
+    } finally {
+      setFavoriteLoading(false);
     }
   };
 
   useEffect(() => {
-    getProducts();
+    checkFavorite();
   }, []);
 
   return (
-    <Container>
-      <Section>
-        <Title>Your Favourites</Title>
-        <CardWrapper>
-          {loading ? (
-            <CircularProgress />
+    <Card>
+      <Image src={product?.img} />
+      <Menu>
+        <MenuItem onClick={() => (favorite ? removeFavourite() : addFavourite())}>
+          {favoriteLoading ? (
+            <CircularProgress size={24} />
           ) : (
             <>
-              {products.map((product) => (
-                <ProductsCard product={product} key={product.id} />
-              ))}
+              {favorite ? (
+                <FavoriteRounded style={{ fontSize: "24px", color: "red" }} />
+              ) : (
+                <FavoriteBorder style={{ fontSize: "24px" }} />
+              )}
             </>
           )}
-        </CardWrapper>
-      </Section>
-    </Container>
+        </MenuItem>
+      </Menu>
+      <Rate>
+        <Rating value={3.5} readOnly />
+      </Rate>
+      <Details onClick={() => product && navigate(`/product/${product._id}`)}>
+        <Title>{product?.name}</Title>
+        <Desc>{product?.desc}</Desc>
+        <Price>
+          ${product?.price?.org} <Span>${product?.price?.mrp}</Span>
+          <Percent> (${product?.price?.off}% Off) </Percent>
+        </Price>
+      </Details>
+    </Card>
   );
 };
 
-export default Favourites;
+export default Favourite;
